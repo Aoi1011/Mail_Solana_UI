@@ -11,8 +11,8 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Switch>
-          <Route path="/" component={Navbar} />
-          <Route path="/" component={Signin} />
+          {/* <Route path="/" component={Navbar} /> */}
+          <Route path="/signin" component={Signin} />
         </Switch>
       </ThemeProvider>
     </Router>
