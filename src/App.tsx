@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import theme from "./theme";
 import Navbar from "./components/Navbar";
+import Signin from "./pages/loggedout/Signin";
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
         <CssBaseline />
         <Switch>
           <Route path="/" component={Navbar} />
+          <Route path="/" component={Signin} />
         </Switch>
       </ThemeProvider>
     </Router>
