@@ -4,6 +4,7 @@ import { CssBaseline, ThemeProvider } from "@mui/material";
 import theme from "./theme";
 import Navbar from "./components/Navbar";
 import Signin from "./pages/loggedout/Signin";
+import Main from "./pages/loggedin";
 
 function App() {
   return (
@@ -12,7 +13,8 @@ function App() {
         <CssBaseline />
         <Switch>
           {/* <Route path="/" component={Navbar} /> */}
-          <Route path="/signin" component={Signin} />
+          <Route path="/mail" exact component={Main} />
+          <Route path="/" exact component={Signin} />
         </Switch>
       </ThemeProvider>
     </Router>

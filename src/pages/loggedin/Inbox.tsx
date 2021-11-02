@@ -1,0 +1,27 @@
+import React, { Fragment } from "react";
+import { Fab } from "@mui/material";
+import { Edit as EditIcon } from "@mui/icons-material";
+
+const Inbox = (props: any) => {
+  return (
+    <Fragment>
+      <Fab
+        variant="extended"
+        size="large"
+        color="secondary"
+        aria-label="compose mail"
+        onClick={() => props.history.push("send")}
+        sx={{
+          position: "absolute",
+          bottom: 48,
+          right: 16,
+        }}
+      >
+        <EditIcon sx={{ mr: 1 }} />
+        Send Mail
+      </Fab>
+    </Fragment>
+  );
+};
+
+export default Inbox;

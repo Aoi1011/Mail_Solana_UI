@@ -3,7 +3,7 @@ import { Route, Switch } from "react-router-dom";
 import { Box, useTheme } from "@mui/material";
 
 import Navbar from "../../components/Navbar";
-import { Inbox } from "Inbox";
+import Inbox from "./Inbox";
 
 const Main = (props: any) => {
   const theme = useTheme();
