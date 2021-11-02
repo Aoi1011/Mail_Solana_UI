@@ -31,3 +31,5 @@ const MailTableHead = (props: any) => {
     </TableHead>
   );
 };
+
+export default MailTableHead;
