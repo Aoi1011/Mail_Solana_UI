@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   AppBar,
   Box,
@@ -17,6 +17,8 @@ import {
   Mail as MailIcon,
   Menu as MenuIcon,
 } from "@mui/icons-material";
+import { Link } from "react-router-dom";
+import theme from "../theme";
 
 const drawerWidth = 240;
 const menuItems = [
@@ -34,6 +36,11 @@ const menuItems = [
 
 const Navbar = (props: any) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const links = useRef([]);
+
+  const handleLogout = async () => {
+    props.history.push("/");
+  };
 
   const menu = (
     <div>
@@ -53,13 +60,23 @@ const Navbar = (props: any) => {
       <Divider />
       <List>
         {menuItems.map((el, index) => (
-          <ListItemButton>
-            <ListItemIcon>{el.icon}</ListItemIcon>
-            <ListItemText primary={el.name} />
-          </ListItemButton>
+          <Link
+            to={el.link}
+            style={{
+              textDecoration: "none",
+              color: theme.palette.text.primary,
+            }}
+            key={index}
+            ref={(node) => (links.current[index] = node)}
+          >
+            <ListItemButton>
+              <ListItemIcon>{el.icon}</ListItemIcon>
+              <ListItemText primary={el.name} />
+            </ListItemButton>
+          </Link>
         ))}
         <Divider />
-        <ListItemButton>
+        <ListItemButton onClick={handleLogout}>
           <ListItemIcon>
             <LogoutIcon />
           </ListItemIcon>
