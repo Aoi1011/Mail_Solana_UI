@@ -6,6 +6,7 @@ import Navbar from "../../components/Navbar";
 import Inbox from "./Inbox";
 import SendMail from "./SendMail";
 import Sent from "./Sent";
+import ViewMail from "./ViewMail";
 
 const Main = (props: any) => {
   const theme = useTheme();
@@ -22,8 +23,9 @@ const Main = (props: any) => {
       >
         <Switch>
           <Route path="/mail/inbox" component={Inbox} />
-          <Route path="/mail/send" component={SendMail} />
           <Route path="/mail/sent" component={Sent} />
+          <Route path="/mail/send" component={SendMail} />
+          <Route path="/mail/view/:id" component={ViewMail} />
         </Switch>
       </Box>
     </Fragment>
