@@ -1,10 +1,12 @@
 import React, { Fragment } from "react";
 import { Fab } from "@mui/material";
 import { Edit as EditIcon } from "@mui/icons-material";
+import MailTable from "../../components/MailTable";
 
 const Inbox = (props: any) => {
   return (
     <Fragment>
+      <MailTable data={[]} history={props.history} />
       <Fab
         variant="extended"
         size="large"
