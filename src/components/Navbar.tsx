@@ -10,6 +10,7 @@ import {
   ListItemIcon,
   ListItemText,
   Toolbar,
+  useTheme
 } from "@mui/material";
 import {
   Inbox as InboxIcon,
@@ -18,7 +19,6 @@ import {
   Menu as MenuIcon,
 } from "@mui/icons-material";
 import { Link } from "react-router-dom";
-import theme from "../theme";
 
 const drawerWidth = 240;
 const menuItems = [
@@ -36,7 +36,9 @@ const menuItems = [
 
 const Navbar = (props: any) => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const links = useRef([]);
+  const links = useRef([]) as any;
+
+  const theme = useTheme();
 
   const handleLogout = async () => {
     props.history.push("/");
