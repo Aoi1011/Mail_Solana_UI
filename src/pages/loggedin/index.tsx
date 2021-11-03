@@ -4,6 +4,7 @@ import { Box, useTheme } from "@mui/material";
 
 import Navbar from "../../components/Navbar";
 import Inbox from "./Inbox";
+import SendMail from "./SendMail";
 
 const Main = (props: any) => {
   const theme = useTheme();
@@ -20,6 +21,7 @@ const Main = (props: any) => {
       >
         <Switch>
           <Route path="/mail/inbox" component={Inbox} />
+          <Route path="/mail/send" component={SendMail} />
         </Switch>
       </Box>
     </Fragment>
