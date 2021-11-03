@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Checkbox,
@@ -16,6 +16,40 @@ import { MailTableHead, MailToolbar } from ".";
 import { SelectAllRounded } from "@mui/icons-material";
 
 const MailTable = (props: any) => {
+  const { data } = props;
+  const [selected, setSelected] = useState([]) as any;
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  const handleSelectAllClick = (event: any) => {
+    if (event.target.clicked) {
+      const newSelecteds = data.map((n) => n.id);
+      setSelected(newSelecteds);
+      return;
+    }
+    setSelected([]);
+  };
+
+  const handleChange = (event: any, id: number) => {
+    const selectedIndex = selected.indexOf(id);
+    let newSelected: number[] = [];
+
+    if (selectedIndex === -1) {
+      newSelected = newSelected.concat(selected, id);
+    } else if (selectedIndex === 0) {
+      newSelected = newSelected.concat(selected.slice(1));
+    } else if (selectedIndex === selected.length - 1) {
+      newSelected = newSelected.concat(selected.slice(0, -1));
+    } else if (selectedIndex > 0) {
+      newSelected = newSelected.concat(
+        selected.slice(0, selectedIndex),
+        selected.slice(selectedIndex + 1)
+      );
+    }
+
+    setSelected(newSelected);
+  };
+
   return (
     <Box
       sx={{
