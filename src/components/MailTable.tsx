@@ -12,7 +12,8 @@ import {
   Typography,
 } from "@mui/material";
 
-import { MailTableHead, MailToolbar } from ".";
+import MailTableHead from "./MailTableHead";
+import MailToolbar from "./MailToolbar";
 import { SelectAllRounded } from "@mui/icons-material";
 
 const MailTable = (props: any) => {
@@ -23,7 +24,7 @@ const MailTable = (props: any) => {
 
   const handleSelectAllClick = (event: any) => {
     if (event.target.clicked) {
-      const newSelecteds = data.map((n) => n.id);
+      const newSelecteds = data.map((n: any) => n.id);
       setSelected(newSelecteds);
       return;
     }
@@ -49,6 +50,23 @@ const MailTable = (props: any) => {
 
     setSelected(newSelected);
   };
+
+  const handleRowClick = (mail: any) => {
+    props.history.push(`/mail/view/${mail.id}`, mail);
+  };
+
+  const handleChangePage = (event: any, newPage: number) => {
+      setPage(newPage);
+  }
+
+  const handleChangeRowsPerPage = (event: any) => {
+      setRowsPerPage(parseInt(event.target.value, 10));
+      setPage(0);
+  }
+
+  const isSelected = (id: number) => selected.indexOf(id) !== -1;
+
+  const emptyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - data.length) : 0;
 
   return (
     <Box
@@ -77,7 +95,7 @@ const MailTable = (props: any) => {
             <TableBody>
               {data
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((row, index) => {
+                .map((row: any, index: any) => {
                   const isItemSelected = isSelected(row.id);
                   const labelId = `enhanced-table-checkbox-${index}`;
 
