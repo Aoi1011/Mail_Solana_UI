@@ -43,8 +43,8 @@ async function createOrGetAccount(seed: any, programId: any) {
 
   await wallet.connect();
 
-  const derivedAddress = await PublicKey.createProgramAddress(
-    // wallet.publicKey,
+  const derivedAddress = await PublicKey.createWithSeed(
+    wallet.publicKey!,
     seed,
     programId
   );
