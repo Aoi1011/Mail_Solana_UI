@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import theme from "./theme";
-import Navbar from "./components/Navbar";
+// import Navbar from "./components/Navbar";
 import Signin from "./pages/loggedout/Signin";
 import Main from "./pages/loggedin";
 import { store } from "./store";
