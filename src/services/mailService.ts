@@ -12,7 +12,7 @@ const connection = new Connection(cluster);
 export async function fetchData(accountId: any) {
   const accountInfo = await connection.getAccountInfo(accountId);
 
-  return MailAccount.decode(accountInfo?.data);
+  return MailAccount.decode(accountInfo!.data);
 }
 
 export async function send(mail: any, programId: any, wallet: any) {

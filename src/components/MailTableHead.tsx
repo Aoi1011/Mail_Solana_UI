@@ -17,6 +17,7 @@ const MailTableHead = (props: any) => {
             color="primary"
             indeterminate={numSelected > 0 && numSelected < rowCount}
             checked={rowCount > 0 && numSelected === rowCount}
+            onChange={onSelectedAllClick}
             inputProps={{
               "aria-label": "select all mail",
             }}
