@@ -9,10 +9,11 @@ export interface Post {
   id: number;
   title: string;
   body: string;
+  createdAt: number;
 }
 
 function createBasePost(): Post {
-  return { creator: "", id: 0, title: "", body: "" };
+  return { creator: "", id: 0, title: "", body: "", createdAt: 0 };
 }
 
 export const Post = {
@@ -28,6 +29,9 @@ export const Post = {
     }
     if (message.body !== "") {
       writer.uint32(34).string(message.body);
+    }
+    if (message.createdAt !== 0) {
+      writer.uint32(40).int64(message.createdAt);
     }
     return writer;
   },
@@ -51,6 +55,9 @@ export const Post = {
         case 4:
           message.body = reader.string();
           break;
+        case 5:
+          message.createdAt = longToNumber(reader.int64() as Long);
+          break;
         default:
           reader.skipType(tag & 7);
           break;
@@ -65,6 +72,7 @@ export const Post = {
       id: isSet(object.id) ? Number(object.id) : 0,
       title: isSet(object.title) ? String(object.title) : "",
       body: isSet(object.body) ? String(object.body) : "",
+      createdAt: isSet(object.createdAt) ? Number(object.createdAt) : 0,
     };
   },
 
@@ -74,6 +82,7 @@ export const Post = {
     message.id !== undefined && (obj.id = Math.round(message.id));
     message.title !== undefined && (obj.title = message.title);
     message.body !== undefined && (obj.body = message.body);
+    message.createdAt !== undefined && (obj.createdAt = Math.round(message.createdAt));
     return obj;
   },
 
@@ -83,6 +92,7 @@ export const Post = {
     message.id = object.id ?? 0;
     message.title = object.title ?? "";
     message.body = object.body ?? "";
+    message.createdAt = object.createdAt ?? 0;
     return message;
   },
 };
