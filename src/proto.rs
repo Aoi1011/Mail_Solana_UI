@@ -2,7 +2,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use tokio;
 use tokio::prelude::*;
 
-use std::io::{self};
+use std::io;
 
 #[repr(i32)]
 pub enum OpCode {
@@ -84,7 +84,6 @@ impl Request {
                 read_only,
             } => {
                 // buffer.write_i32(OpCode::Auth);
-                // n += 4;
                 buffer.write_i32::<BigEndian>(protocol_version)?;
                 buffer.write_i64::<BigEndian>(last_zxid_seen)?;
                 buffer.write_i32::<BigEndian>(timeout)?;
@@ -144,5 +143,14 @@ impl<S> Sink for Packetizer<S> {
         } else {
             Ok(Async::NotReady)
         }
+    }
+}
+
+impl Stream<S> for Packetizer<S> where S: AsyncRead{
+    type Item = Response;
+    type Error = failure::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        let length = 
     }
 }
