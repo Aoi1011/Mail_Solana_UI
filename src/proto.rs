@@ -2,6 +2,32 @@ use byteorder::{BigEndian, WriteBytesExt};
 use tokio;
 use tokio::prelude::*;
 
+use std::io::{self};
+
+#[repr(i32)]
+pub enum OpCode {
+    Notification = 0,
+    Create = 1,
+    Delete = 2,
+    Exists = 3,
+    GetData = 4,
+    SetData = 5,
+    GetACL = 6,
+    SetACL = 7,
+    GetChildren = 8,
+    Synchronize = 9,
+    Ping = 11,
+    GetChildren2 = 12,
+    Check = 13,
+    Multi = 14,
+    Auth = 100,
+    SetWatches = 101,
+    Sasl = 102,
+    CreateSession = -10,
+    CloseSession = -11,
+    Error = -1,
+}
+
 pub struct Packetizer<S> {
     stream: S,
 
@@ -34,8 +60,8 @@ impl<S> Packetizer<S> {
     }
 }
 
-pub(crate) enum ZookeeperRequest {
-    ConnectRequest {
+pub(crate) enum Request {
+    Connect {
         protocol_version: i32,
         last_zxid_seen: i64,
         timeout: i32,
@@ -45,14 +71,35 @@ pub(crate) enum ZookeeperRequest {
     },
 }
 
-impl ZookeeperRequest {
-    fn serialize_into(&self, buffer: &mut Vec<u8>) -> usize {
-        unimplemented!()
+impl Request {
+    fn serialize_into(&self, buffer: &mut Vec<u8>) -> Result<(), io::Error> {
+        let mut n = 0;
+        match *self {
+            Request::Connect {
+                protocol_version,
+                last_zxid_seen,
+                timeout,
+                session_id,
+                ref passwd,
+                read_only,
+            } => {
+                // buffer.write_i32(OpCode::Auth);
+                // n += 4;
+                buffer.write_i32::<BigEndian>(protocol_version)?;
+                buffer.write_i64::<BigEndian>(last_zxid_seen)?;
+                buffer.write_i32::<BigEndian>(timeout)?;
+                buffer.write_i64::<BigEndian>(session_id)?;
+                buffer.write_i32::<BigEndian>(passwd.len() as i32)?;
+                buffer.write_all(passwd)?;
+                buffer.write_u8(read_only as u8)?;
+                Ok(())
+            }
+        }
     }
 }
 
 impl<S> Sink for Packetizer<S> {
-    type SinkItem = ZookeeperRequest;
+    type SinkItem = Request;
     type SinkError = failure::Error;
 
     fn start_send(
@@ -66,18 +113,23 @@ impl<S> Sink for Packetizer<S> {
         self.outbox.push(0);
         self.outbox.push(0);
 
-        // xid
-        self.outbox
-            .write_i32::<BigEndian>(self.xid)
-            .expect("Vec::write should never fail");
+        if let Request::Connect { .. } = item {
+        } else {
+            // xid
+            self.outbox
+                .write_i32::<BigEndian>(self.xid)
+                .expect("Vec::write should never fail");
+        }
 
         // type and payload
-        let n = item.serialize_into(&mut self.outbox);
+        item.serialize_into(&mut self.outbox)
+            .expect("Vec::Write should never fail");
 
         // set true length
+        let written = self.outbox.len() - lengthi - 4;
         let length = &mut self.outbox[lengthi..lengthi + 4];
         length
-            .write_i32::<BigEndian>(0)
+            .write_i32::<BigEndian>(written as i32)
             .expect("Vec::write should never fail");
         Ok(AsyncSink::Ready)
     }
