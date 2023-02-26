@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use byteorder::{BigEndian, WriteBytesExt};
 
 #[repr(i32)]
-pub enum OpCode {
+pub(super) enum OpCode {
     Notification = 0,
     Create = 1,
     Delete = 2,
@@ -24,9 +24,10 @@ pub enum OpCode {
     CreateSession = -10,
     CloseSession = -11,
     Error = -1,
+    Connect = -100,
 }
 
-pub(crate) enum Request {
+pub enum Request {
     Connect {
         protocol_version: i32,
         last_zxid_seen: i64,
@@ -59,6 +60,12 @@ impl Request {
                 buffer.write_u8(read_only as u8)?;
                 Ok(())
             }
+        }
+    }
+
+    pub(super) fn opcode(&self) -> OpCode {
+        match *self {
+            Request::Connect { .. } => OpCode::Connect,
         }
     }
 }
