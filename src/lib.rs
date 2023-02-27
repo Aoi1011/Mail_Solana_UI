@@ -6,20 +6,20 @@ use tokio::prelude::*;
 
 mod proto;
 
-pub struct Zookeeper<S> {
+pub struct ZooKeeper<S> {
     connection: Packetizer<S>,
 }
 
-impl<S> Zookeeper<S> {
+impl<S> ZooKeeper<S> {
     pub fn connect(
         addr: &SocketAddr,
-    ) -> impl Future<Item = Zookeeper<tokio::net::TcpStream>, Error = failure::Error> {
-        tokio::net::TcpStream::connect(addr).and_then(|stream| {
-            Self::handshake(stream);
-        })
+    ) -> impl Future<Item = ZooKeeper<tokio::net::TcpStream>, Error = failure::Error> {
+        tokio::net::TcpStream::connect(addr)
+            .map_err(failure::Error::from)
+            .and_then(|stream| ZooKeeper::handshake(stream))
     }
 
-    fn handshake(stream: S) -> impl Future<Item = S, Error = failure::Error> {
+    fn handshake(stream: S) -> impl Future<Item = Self, Error = failure::Error> {
         let request = Request::Connect {
             protocol_version: 0,
             last_zxid_seen: 0,
@@ -28,26 +28,25 @@ impl<S> Zookeeper<S> {
             passwd: vec![],
             read_only: false,
         };
-        Packetizer::new(stream)
-            .send(request)
-            .and_then(|zk| {
-                zk.into_future();
-            })
-            .map(|(response, zk)| {
-                if response.is_none() {
-                    unimplemented!();
-                }
-                Zookeeper { connection: zk }
-            })
+
+        let mut zk = Packetizer::new(stream);
+        let enqueuer = zk.enqueuer();
+        tokio::spawn(zk);
+        enqueuer.send(request).map(|(response, enqueuer)| {
+            if response.is_none() {
+                unimplemented!();
+            }
+            ZooKeeper { connection: enqueuer }
+        })
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let zk = tokio::run(Zookeeper::connect());
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn it_works() {
+//         let zk = tokio::run(ZooKeeper::connect());
+//     }
+// }

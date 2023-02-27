@@ -1,12 +1,12 @@
-use std::io::{self, Read};
+use std::io::Read;
 
 use byteorder::{BigEndian, ReadBytesExt};
 use failure::{self, bail};
 
-use super::request::OpCode;
+use crate::proto::request::OpCode;
 
 pub(crate) enum Response {
-    ConnectResponse {
+    Connect {
         protocol_version: i32,
         timeout: i32,
         session_id: i64,
@@ -41,7 +41,7 @@ impl Response {
     pub(super) fn parse(opcode: OpCode, buf: &[u8]) -> Result<Self, failure::Error> {
         let mut reader = buf;
         match opcode {
-            OpCode::Connect => Ok(Response::ConnectResponse {
+            OpCode::Connect => Ok(Response::Connect {
                 protocol_version: reader.read_i32::<BigEndian>()?,
                 timeout: reader.read_i32::<BigEndian>()?,
                 session_id: reader.read_i64::<BigEndian>()?,
