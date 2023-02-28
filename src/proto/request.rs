@@ -4,6 +4,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 
 #[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[repr(i32)]
+#[allow(dead_code)]
 pub(super) enum OpCode {
     Notification = 0,
     Create = 1,
@@ -41,7 +42,6 @@ pub enum Request {
 
 impl Request {
     pub(super) fn serialize_into(&self, buffer: &mut Vec<u8>) -> Result<(), io::Error> {
-        let mut n = 0;
         match *self {
             Request::Connect {
                 protocol_version,

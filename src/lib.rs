@@ -31,18 +31,24 @@ impl ZooKeeper {
         };
 
         let enqueuer = Packetizer::new(stream);
-        enqueuer.enqueue(request).map(move |response| ZooKeeper {
-            connection: enqueuer,
+        enqueuer.enqueue(request).map(move |response| {
+            eprintln!("{:?}", response);
+            ZooKeeper {
+                connection: enqueuer,
+            }
         })
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn it_works() {
-//         let zk = tokio::run(ZooKeeper::connect());
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let zk = rt.block_on(ZooKeeper::connect(&"127.0.0.1:2181".parse().unwrap()));
+        drop(zk);
+        rt.shutdown_on_idle();
+    }
+}

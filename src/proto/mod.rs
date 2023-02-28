@@ -70,6 +70,7 @@ impl<S> Packetizer<S> {
         S: 'static + Send + AsyncRead + AsyncWrite,
     {
         let (tx, rx) = mpsc::unbounded();
+
         tokio::spawn(
             Packetizer {
                 stream,
@@ -168,16 +169,16 @@ where
         S: AsyncRead,
     {
         loop {
-            let mut need = if self.inlen() > 4 {
-                let length = (&mut &self.inbox[self.instart..]).read_i32::<BigEndian>()?;
+            let mut need = if self.inlen() >= 4 {
+                let length = (&mut &self.inbox[self.instart..]).read_i32::<BigEndian>()? as usize;
                 length + 4
             } else {
                 4
             };
 
-            while self.inlen() < need as usize {
+            while self.inlen() < need {
                 let read_from = self.inbox.len();
-                self.inbox.resize(read_from + need as usize, 0);
+                self.inbox.resize(read_from + need, 0);
                 match self.stream.poll_read(&mut self.inbox[read_from..])? {
                     Async::Ready(n) => {
                         if n == 0 {
@@ -191,9 +192,9 @@ where
                             }
                         }
                         self.inbox.truncate(read_from + n);
-                        if self.inlen() > 4 && need != 4 {
+                        if self.inlen() >= 4 && need == 4 {
                             let length =
-                                (&mut &self.inbox[self.instart..]).read_i32::<BigEndian>()?;
+                                (&mut &self.inbox[self.instart..]).read_i32::<BigEndian>()? as usize;
                             need += length;
                         }
                     }
@@ -205,23 +206,21 @@ where
             }
 
             {
-                let mut buf = &self.inbox[self.instart..self.instart + need as usize];
-                let length = buf.read_i32::<BigEndian>()?;
+                let mut buf = &self.inbox[self.instart + 4..self.instart + need];
                 let xid = buf.read_i32::<BigEndian>()?;
 
                 // find the waiting request future
                 let (opcode, tx) = self.reply.remove(&xid).unwrap(); // return an error if xid was unknown
 
                 let r = Response::parse(opcode, buf)?;
-                self.instart += need as usize;
-                tx.send(r);
+                self.instart += need;
+                tx.send(r).is_ok();
             }
 
             if self.instart == self.inbox.len() {
                 self.inbox.clear();
                 self.instart = 0;
             }
-            return Ok(Async::Ready(()));
         }
     }
 }
