@@ -2,6 +2,7 @@ use std::io::{self, Write};
 
 use byteorder::{BigEndian, WriteBytesExt};
 
+#[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 #[repr(i32)]
 pub(super) enum OpCode {
     Notification = 0,
@@ -24,9 +25,9 @@ pub(super) enum OpCode {
     CreateSession = -10,
     CloseSession = -11,
     Error = -1,
-    Connect = -100,
 }
 
+#[derive(Debug)]
 pub enum Request {
     Connect {
         protocol_version: i32,
@@ -65,7 +66,7 @@ impl Request {
 
     pub(super) fn opcode(&self) -> OpCode {
         match *self {
-            Request::Connect { .. } => OpCode::Connect,
+            Request::Connect { .. } => OpCode::CreateSession,
         }
     }
 }

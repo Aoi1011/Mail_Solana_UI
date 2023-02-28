@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use failure::bail;
-use futures::sync::mpsc;
+use failure::{bail, format_err};
 use futures::try_ready;
+use futures::{
+    future::Either,
+    sync::{mpsc, oneshot},
+};
 use tokio;
 use tokio::prelude::*;
 
@@ -12,6 +15,25 @@ use self::response::Response;
 
 pub mod request;
 pub mod response;
+
+pub(crate) struct Enqueuer(mpsc::UnboundedSender<(Request, oneshot::Sender<Response>)>);
+
+impl Enqueuer {
+    pub(crate) fn enqueue(
+        &self,
+        req: Request,
+    ) -> impl Future<Item = Response, Error = failure::Error> {
+        let (tx, rx) = oneshot::channel();
+        match self.0.unbounded_send((req, tx)) {
+            Ok(()) => {
+                Either::A(rx.map_err(|e| format_err!("failed to enqueue new request: {:?}", e)))
+            }
+            Err(e) => {
+                Either::B(Err(format_err!("failed to enqueue new request: {:?}", e))).into_future()
+            }
+        }
+    }
+}
 
 pub struct Packetizer<S> {
     stream: S,
@@ -30,77 +52,92 @@ pub struct Packetizer<S> {
 
     /// What operation are we waiting for a response for?
     /// keep xid, and where to send request
-    reply: HashMap<i32, (OpCode, futures::unsync::oneshot::Sender<Response>)>,
+    reply: HashMap<i32, (OpCode, oneshot::Sender<Response>)>,
 
     /// Incoming requests
-    rx: mpsc::Receiver<Request>,
+    rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Response>)>,
 
     /// Next xid to issue
     xid: i32,
+
+    exiting: bool,
 }
 
 impl<S> Packetizer<S> {
-    pub(crate) fn new(stream: S) -> mpsc::Sender<Request> {
+    // TODO: document that it calls tokio::spawn
+    pub(crate) fn new(stream: S) -> Enqueuer
+    where
+        S: 'static + Send + AsyncRead + AsyncWrite,
+    {
         let (tx, rx) = mpsc::unbounded();
-        tokio::spawn(Packetizer {
-            stream,
-            outbox: Vec::new(),
-            outstart: 0,
-            inbox: Vec::new(),
-            instart: 0,
-            xid: 0,
-            reply: Default::default(),
-            rx,
-        });
+        tokio::spawn(
+            Packetizer {
+                stream,
+                outbox: Vec::new(),
+                outstart: 0,
+                inbox: Vec::new(),
+                instart: 0,
+                xid: 0,
+                reply: Default::default(),
+                rx,
+                exiting: false,
+            }
+            .map_err(|e| {
+                // TODO: expose this error to the user somehow
+                drop(e);
+            }),
+        );
 
-        tx
+        Enqueuer(tx)
+    }
+}
+
+impl<S> Packetizer<S> {
+    pub fn outlen(&self) -> usize {
+        self.outbox.len() - self.outstart
     }
 
     pub fn inlen(&self) -> usize {
         self.inbox.len() - self.instart
     }
 
-    pub fn outlen(&self) -> usize {
-        self.outbox.len() - self.outstart
-    }
+    pub(crate) fn poll_enqueue(&mut self) -> Result<Async<()>, ()> {
+        loop {
+            let (item, tx) = match try_ready!(self.rx.poll()) {
+                Some((item, tx)) => (item, tx),
+                None => return Err(()),
+            };
 
-    pub(crate) fn enqueue(
-        &mut self,
-        item: Request,
-    ) -> impl Future<Item = Response, Error = failure::Error> {
-        let (tx, rx) = futures::unsync::oneshot::channel();
+            let lengthi = self.outbox.len();
+            // dummy length
+            self.outbox.push(0);
+            self.outbox.push(0);
+            self.outbox.push(0);
+            self.outbox.push(0);
 
-        let lengthi = self.outbox.len();
-        // dummy length
-        self.outbox.push(0);
-        self.outbox.push(0);
-        self.outbox.push(0);
-        self.outbox.push(0);
+            let xid = self.xid;
+            self.xid += 1;
+            self.reply.insert(xid as i32, (item.opcode(), tx));
 
-        let xid = self.xid;
-        self.xid += 1;
-        self.reply.insert(xid as i32, (item.opcode(), tx));
+            if let Request::Connect { .. } = item {
+            } else {
+                // xid
+                self.outbox
+                    .write_i32::<BigEndian>(self.xid)
+                    .expect("Vec::write should never fail");
+            }
 
-        if let Request::Connect { .. } = item {
-        } else {
-            // xid
-            self.outbox
-                .write_i32::<BigEndian>(self.xid)
+            // type and payload
+            item.serialize_into(&mut self.outbox)
+                .expect("Vec::Write should never fail");
+
+            // set true length
+            let written = self.outbox.len() - lengthi - 4;
+            let mut length = &mut self.outbox[lengthi..lengthi + 4];
+            length
+                .write_i32::<BigEndian>(written as i32)
                 .expect("Vec::write should never fail");
         }
-
-        // type and payload
-        item.serialize_into(&mut self.outbox)
-            .expect("Vec::Write should never fail");
-
-        // set true length
-        let written = self.outbox.len() - lengthi - 4;
-        let mut length = &mut self.outbox[lengthi..lengthi + 4];
-        length
-            .write_i32::<BigEndian>(written as i32)
-            .expect("Vec::write should never fail");
-
-        rx.map_err(failure::Error::from)
     }
 }
 
@@ -197,12 +234,27 @@ where
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if !self.exiting {
+            match self.poll_enqueue() {
+                Ok(_) => {}
+                Err(()) => {
+                    // no more requests will be enqueued
+                    self.exiting = true;
+                }
+            }
+        }
+
         let r = self.poll_read()?;
         let w = self.poll_write()?;
 
         match (r, w) {
-            (Async::Ready(()), Async::Ready(())) => Ok(Async::Ready(())),
+            (Async::Ready(()), Async::Ready(())) if self.exiting => Ok(Async::Ready(())),
+            (Async::Ready(()), Async::Ready(())) => Ok(Async::NotReady),
             (Async::Ready(()), _) => bail!("outstandig requests, but response channel closed."),
+            (_, Async::Ready(())) if self.exiting => {
+                // TODO: send OpCode::CloseSession
+                Ok(Async::NotReady)
+            }
             _ => Ok(Async::NotReady),
         }
     }

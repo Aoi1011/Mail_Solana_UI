@@ -1,25 +1,26 @@
 use std::net::SocketAddr;
 
 use failure;
-use proto::{request::Request, Packetizer};
+use proto::{request::Request, Enqueuer, Packetizer};
 use tokio::prelude::*;
 
 mod proto;
 
-pub struct ZooKeeper<S> {
-    connection: Packetizer<S>,
+pub struct ZooKeeper {
+    connection: Enqueuer,
 }
 
-impl<S> ZooKeeper<S> {
-    pub fn connect(
-        addr: &SocketAddr,
-    ) -> impl Future<Item = ZooKeeper<tokio::net::TcpStream>, Error = failure::Error> {
+impl ZooKeeper {
+    pub fn connect(addr: &SocketAddr) -> impl Future<Item = Self, Error = failure::Error> {
         tokio::net::TcpStream::connect(addr)
             .map_err(failure::Error::from)
-            .and_then(|stream| ZooKeeper::handshake(stream))
+            .and_then(|stream| Self::handshake(stream))
     }
 
-    fn handshake(stream: S) -> impl Future<Item = Self, Error = failure::Error> {
+    fn handshake<S>(stream: S) -> impl Future<Item = Self, Error = failure::Error>
+    where
+        S: 'static + Send + AsyncRead + AsyncWrite,
+    {
         let request = Request::Connect {
             protocol_version: 0,
             last_zxid_seen: 0,
@@ -29,14 +30,9 @@ impl<S> ZooKeeper<S> {
             read_only: false,
         };
 
-        let mut zk = Packetizer::new(stream);
-        let enqueuer = zk.enqueuer();
-        tokio::spawn(zk);
-        enqueuer.send(request).map(|(response, enqueuer)| {
-            if response.is_none() {
-                unimplemented!();
-            }
-            ZooKeeper { connection: enqueuer }
+        let enqueuer = Packetizer::new(stream);
+        enqueuer.enqueue(request).map(move |response| ZooKeeper {
+            connection: enqueuer,
         })
     }
 }

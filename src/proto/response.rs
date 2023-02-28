@@ -5,6 +5,7 @@ use failure::{self, bail};
 
 use crate::proto::request::OpCode;
 
+#[derive(Debug)]
 pub(crate) enum Response {
     Connect {
         protocol_version: i32,
@@ -41,7 +42,7 @@ impl Response {
     pub(super) fn parse(opcode: OpCode, buf: &[u8]) -> Result<Self, failure::Error> {
         let mut reader = buf;
         match opcode {
-            OpCode::Connect => Ok(Response::Connect {
+            OpCode::CreateSession => Ok(Response::Connect {
                 protocol_version: reader.read_i32::<BigEndian>()?,
                 timeout: reader.read_i32::<BigEndian>()?,
                 session_id: reader.read_i64::<BigEndian>()?,
