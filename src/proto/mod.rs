@@ -29,7 +29,7 @@ impl Enqueuer {
                 Either::A(rx.map_err(|e| format_err!("failed to enqueue new request: {:?}", e)))
             }
             Err(e) => {
-                Either::B(Err(format_err!("failed to enqueue new request: {:?}", e))).into_future()
+                Either::B(Err(format_err!("failed to enqueue new request: {:?}", e)).into_future())
             }
         }
     }
