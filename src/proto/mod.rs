@@ -108,6 +108,7 @@ impl<S> Packetizer<S> {
                 Some((item, tx)) => (item, tx),
                 None => return Err(()),
             };
+            eprintln!("got request: {:?}", item);
 
             let lengthi = self.outbox.len();
             // dummy length
@@ -193,8 +194,9 @@ where
                         }
                         self.inbox.truncate(read_from + n);
                         if self.inlen() >= 4 && need == 4 {
-                            let length =
-                                (&mut &self.inbox[self.instart..]).read_i32::<BigEndian>()? as usize;
+                            let length = (&mut &self.inbox[self.instart..])
+                                .read_i32::<BigEndian>()?
+                                as usize;
                             need += length;
                         }
                     }
@@ -209,8 +211,11 @@ where
                 let mut buf = &self.inbox[self.instart + 4..self.instart + need];
                 let xid = buf.read_i32::<BigEndian>()?;
 
+                eprintln!("RM");
+
                 // find the waiting request future
                 let (opcode, tx) = self.reply.remove(&xid).unwrap(); // return an error if xid was unknown
+                eprintln!("handling response to xid: {} with opcode {:?}", xid, opcode);
 
                 let r = Response::parse(opcode, buf)?;
                 self.instart += need;
@@ -233,6 +238,7 @@ where
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        eprintln!("packetizer polled");
         if !self.exiting {
             match self.poll_enqueue() {
                 Ok(_) => {}
@@ -247,7 +253,10 @@ where
         let w = self.poll_write()?;
 
         match (r, w) {
-            (Async::Ready(()), Async::Ready(())) if self.exiting => Ok(Async::Ready(())),
+            (Async::Ready(()), Async::Ready(())) if self.exiting => {
+                eprintln!("packetizer done");
+                Ok(Async::Ready(()))
+            }
             (Async::Ready(()), Async::Ready(())) => Ok(Async::NotReady),
             (Async::Ready(()), _) => bail!("outstandig requests, but response channel closed."),
             (_, Async::Ready(())) if self.exiting => {

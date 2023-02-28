@@ -29,6 +29,7 @@ impl ZooKeeper {
             passwd: vec![],
             read_only: false,
         };
+        eprintln!("about to handshake");
 
         let enqueuer = Packetizer::new(stream);
         enqueuer.enqueue(request).map(move |response| {

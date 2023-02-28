@@ -23,11 +23,7 @@ pub trait BufferReader: Read {
 impl<R: Read> BufferReader for R {
     fn read_buffer(&mut self) -> Result<Vec<u8>, failure::Error> {
         let len = self.read_i32::<BigEndian>()?;
-        let len = if len < 0 {
-            0
-        } else {
-            len as usize
-        };
+        let len = if len < 0 { 0 } else { len as usize };
         let mut buf = vec![0; len];
         let read = self.read(&mut buf)?;
         if read == len {
