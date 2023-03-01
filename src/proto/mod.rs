@@ -2,27 +2,33 @@ use std::collections::HashMap;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use failure::{bail, format_err};
-use futures::try_ready;
 use futures::{
     future::Either,
     sync::{mpsc, oneshot},
+    try_ready,
 };
 use tokio;
 use tokio::prelude::*;
 
+use crate::proto::error::ZkError;
+
 use self::request::{OpCode, Request};
 use self::response::Response;
 
+pub mod error;
 pub mod request;
 pub mod response;
 
-pub(crate) struct Enqueuer(mpsc::UnboundedSender<(Request, oneshot::Sender<Response>)>);
+#[derive(Debug, Clone)]
+pub(crate) struct Enqueuer(
+    mpsc::UnboundedSender<(Request, oneshot::Sender<Result<Response, ZkError>>)>,
+);
 
 impl Enqueuer {
     pub(crate) fn enqueue(
         &self,
         req: Request,
-    ) -> impl Future<Item = Response, Error = failure::Error> {
+    ) -> impl Future<Item = Result<Response, ZkError>, Error = failure::Error> {
         let (tx, rx) = oneshot::channel();
         match self.0.unbounded_send((req, tx)) {
             Ok(()) => {
@@ -52,15 +58,17 @@ pub struct Packetizer<S> {
 
     /// What operation are we waiting for a response for?
     /// keep xid, and where to send request
-    reply: HashMap<i32, (OpCode, oneshot::Sender<Response>)>,
+    reply: HashMap<i32, (OpCode, oneshot::Sender<Result<Response, ZkError>>)>,
 
     /// Incoming requests
-    rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Response>)>,
+    rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response, ZkError>>)>,
 
     /// Next xid to issue
     xid: i32,
 
     exiting: bool,
+
+    first: bool,
 }
 
 impl<S> Packetizer<S> {
@@ -82,9 +90,11 @@ impl<S> Packetizer<S> {
                 reply: Default::default(),
                 rx,
                 exiting: false,
+                first: true,
             }
             .map_err(|e| {
                 // TODO: expose this error to the user somehow
+                eprintln!("packetizer exiting: {:?}", e);
                 drop(e);
             }),
         );
@@ -207,19 +217,35 @@ where
                 }
             }
 
+            eprintln!("length: {}", need - 4);
             {
+                let mut err = None;
                 let mut buf = &self.inbox[self.instart + 4..self.instart + need];
-                let xid = buf.read_i32::<BigEndian>()?;
+                let xid = if self.first {
+                    0
+                } else {
+                    let xid = buf.read_i32::<BigEndian>()?;
+                    let _zxid = buf.read_i64::<BigEndian>()?;
+                    let errcode = buf.read_i32::<BigEndian>()?;
+                    if errcode != 0 {
+                        err = Some(ZkError::from(errcode));
+                    }
+                    xid
+                };
 
-                eprintln!("RM");
+                self.first = false;
 
                 // find the waiting request future
                 let (opcode, tx) = self.reply.remove(&xid).unwrap(); // return an error if xid was unknown
                 eprintln!("handling response to xid: {} with opcode {:?}", xid, opcode);
 
-                let r = Response::parse(opcode, buf)?;
                 self.instart += need;
-                tx.send(r).is_ok();
+                if let Some(e) = err {
+                    tx.send(Err(e)).is_ok();
+                } else {
+                    let r = Response::parse(opcode, buf)?;
+                    tx.send(Ok(r)).is_ok();
+                }
             }
 
             if self.instart == self.inbox.len() {

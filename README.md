@@ -7,3 +7,4 @@
 
 ## REFERENCES
 - [Apache Zookeeper](https://zookeeper.apache.org/)
+- [docker Zookeeper](https://hub.docker.com/r/bitnami/zookeeper/)

@@ -1,10 +1,12 @@
 use std::net::SocketAddr;
 
-use failure;
-use proto::{request::Request, Enqueuer, Packetizer};
+use failure::{self, bail};
+use proto::{error::ZkError, request::Request, Enqueuer, Packetizer};
 use tokio::prelude::*;
+use types::Stat;
 
 mod proto;
+mod types;
 
 pub struct ZooKeeper {
     connection: Enqueuer,
@@ -39,6 +41,21 @@ impl ZooKeeper {
             }
         })
     }
+
+    // TODO: want structured error type
+    fn exists(&self, path: &str) -> impl Future<Item = Option<Stat>, Error = failure::Error> {
+        self.connection
+            .enqueue(proto::request::Request::Exists {
+                path: path.to_string(),
+                watch: 0,
+            })
+            .and_then(|r| match r {
+                Ok(proto::response::Response::Exists { stat }) => Ok(Some(stat)),
+                Err(ZkError::NoNode) => Ok(None),
+                Err(e) => bail!("exits call failed {:?}", e),
+                _ => unreachable!(),
+            })
+    }
 }
 
 #[cfg(test)]
@@ -48,7 +65,12 @@ mod tests {
     #[test]
     fn it_works() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
-        let zk = rt.block_on(ZooKeeper::connect(&"127.0.0.1:2181".parse().unwrap()));
+        let zk = rt.block_on(
+            ZooKeeper::connect(&"127.0.0.1:2181".parse().unwrap()).and_then(|zk| {
+                zk.exists("/foo")
+                    .inspect(|stat| eprintln!("exists? {:?}", stat))
+            }),
+        );
         drop(zk);
         rt.shutdown_on_idle();
     }
